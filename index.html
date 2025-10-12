@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<!--スマホでの拡大・縮小が正しく働かず、文字が小さすぎたりレイアウトがずれたりしないためのメタコマンド-->
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!--ブラウザータグの名前-->
+<title>ガンダムかガンダムじゃないかクイズ</title>
+ <!--ページのサイズや位置のコマンド-->
+<style>
+  body {
+    font-family: "Yu Gothic", sans-serif;
+    text-align: center;
+    background-image: url("背景画像/universe_space03.png"); /* 背景画像を指定 */
+    background-size: cover;                           /* 画面いっぱいに広げる */
+    background-position: center;                      /* 中央に配置 */
+    background-repeat: no-repeat;                     /* 繰り返さない */
+    background-attachment: fixed;                     /* スクロールしても固定 */
+    color: #fff;                                      /* 背景が暗めなら文字を白に */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+    font-family: "Yu Gothic", sans-serif;
+    background-color: #f4f4f4;
+    text-align: center;
+  }
+
+/*背景画像に透過の黒フィルターを重ねて、文字が見やすくなるようにするコマンド*/
+  body::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.4); /* ←半透明の黒 */
+    z-index: -1;
+  }
+
+ /* タブレット対応 */
+  @media (max-width: 768px) {
+    body {
+      font-size: 16px;
+      padding: 15px;
+    }
+   button {
+     font-size: 16px;
+     padding: 10px 15px;
+   }
+  }
+
+/* スマホ対応 */
+ @media (max-width: 480px) {
+   body {
+     font-size: 14px;
+     padding: 10px;
+   }
+  button {
+    font-size: 14px;
+    width: 90%;
+    margin: 5px 0;
+  }
+ }
+
+  #quiz-container, #result, #start-screen {
+    margin-top: 50px;
+  }
+
+  #quiz-container, #result, #start-screen, #number-screen {
+    width: 100%;  		/* 横幅も画面いっぱい */
+    max-width: 600px; 		/* 好きな最大幅 */
+  }
+
+  h1{
+    font-size: 30px;
+  }
+
+  p{
+   font-size: 15px;
+  }
+
+  img {
+    width: 600px;		/*画像の横幅*/
+    height: auto;		/*画像の立幅*/
+    border-radius: 12px;
+  }
+  button {
+    margin: 10px;
+    padding: 10px 25px;
+    font-size: 18px;
+    border: none;
+    border-radius: 10px;
+    background-color: #3498db;
+    color: white;
+    cursor: pointer;
+  }
+  button:hover {
+    background-color: #2980b9;
+  }
+  #restart {
+    background-color: #e74c3c;
+  }
+  #restart:hover {
+    background-color: #c0392b;
+  }
+</style>
+
+</head>
+<body>
+
+<!-- 問題数選択画面 -->
+<div id="number-screen" style="display:none;">
+  <h2>何問答えますか？</h2>
+  <div id="number-buttons"></div>
+</div>
+
+<!-- スタート画面 -->
+<div id="start-screen">
+  <h1>ガンダムかガンダムじゃないかクイズ！</h1>
+  <p>画像を見てガンダムなら「〇」ガンダムじゃないなら「×」で答えよう！</p>
+  <button onclick="showNumberScreen()">スタート</button>
+</div>
+
+<!-- クイズ画面 -->
+<div id="quiz-container" style="display:none;">
+  <h2 id="question-number">第1問</h2>
+  <img id="quiz-image" src="" alt="クイズ画像">
+  <div>
+    <!--クイズ画面に出る選択肢ボタン（増やすことも出来る）-->
+    <button onclick="checkAnswer('○')">○</button>
+    <button onclick="checkAnswer('×')">×</button>
+  </div>
+  <p id="score">スコア: 0</p>
+  <p id="judge" style="font-size: 22px; display:none; font-weight:bold;"></p>
+</div>
+
+<!-- 結果画面 -->
+<div id="result" style="display:none;">
+  <h2>結果発表！</h2>
+  <p id="final-score"></p>
+  <button id="restart" onclick="restartQuiz()">もう一度</button>
+</div>
+
+<script>
+  // クイズデータ（画像は自分のPCの画像パスに変更OK）
+  const quizData = [
+    { image: "画像/O1.jpg", answer: "○" },
+    { image: "画像/O2.jpg", answer: "○" },
+    { image: "画像/O3.jpg", answer: "○" },
+    { image: "画像/O4.jpg", answer: "○" },
+    { image: "画像/O5.jpg", answer: "○" },
+    { image: "画像/X1.jpg", answer: "×" },
+    { image: "画像/X2.jpg", answer: "×" },
+    { image: "画像/X3.jpg", answer: "×" },
+    { image: "画像/X4.jpg", answer: "×" },
+    { image: "画像/X5.jpg", answer: "×" },
+  ];
+
+// クイズをランダムに並べ替える関数（Fisher?Yates shuffle）
+  function shuffle(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+}
+
+  let current = 0;
+  let score = 0;
+  let totalQuestions = quizData.length;
+
+  function showNumberScreen() {
+  document.getElementById("start-screen").style.display = "none";
+  document.getElementById("number-screen").style.display = "block";
+
+  const container = document.getElementById("number-buttons");
+  container.innerHTML = ""; // 既存ボタンをクリア
+
+  // 選択肢ボタンを作る
+  const options = [10, 0, 0, 0, 0]; // あとで自由に変更可能
+  options.forEach(num => {
+    const btn = document.createElement("button");
+    btn.innerText = `${num}問`;
+    btn.onclick = () => startQuizWithNumber(num);
+    container.appendChild(btn);
+  });
+}
+
+  function startQuiz() {
+    shuffle(quizData);
+    document.getElementById("start-screen").style.display = "none";
+    document.getElementById("quiz-container").style.display = "block";
+    document.getElementById("result").style.display = "none";
+    current = 0;
+    score = 0;
+    showQuestion();
+  }
+
+  function startQuizWithNumber(num) {
+  totalQuestions = Math.min(num, quizData.length); // データより多く選べないように
+  shuffle(quizData); // ランダム順に並べ替え
+  current = 0;
+  score = 0;
+
+  document.getElementById("number-screen").style.display = "none";
+  document.getElementById("quiz-container").style.display = "block";
+  document.getElementById("result").style.display = "none";
+
+  showQuestion();
+}
+
+function showQuestion() {
+  if (current >= totalQuestions) {
+    showResult();
+    return;
+  }
+  const q = quizData[current];
+  document.getElementById("quiz-image").src = q.image;
+  document.getElementById("question-number").innerText = `第${current + 1}問`;
+  document.getElementById("score").innerText = `スコア: ${score}`;
+}
+
+  function checkAnswer(answer) {
+  const resultText = document.getElementById("judge");
+
+  if (answer === quizData[current].answer) {
+    score++;
+    resultText.innerText = "正解！";
+    resultText.style.color = "green";
+  } else {
+    resultText.innerText = "不正解…";
+    resultText.style.color = "red";
+  }
+
+  // 一瞬表示してから次の問題へ
+  resultText.style.display = "block";
+  setTimeout(() => {
+    resultText.style.display = "none";
+  current++;
+  if (current < totalQuestions) {  // ←quizData.length → totalQuestions
+    showQuestion();
+  } else {
+    showResult();
+  }
+}, 1000);
+}
+
+  function showResult() {
+    document.getElementById("quiz-container").style.display = "none";
+    document.getElementById("result").style.display = "block";
+    document.getElementById("final-score").innerText = `あなたのスコアは ${score} / ${totalQuestions} 点です！`;
+  }
+
+  function restartQuiz() {
+    score = 0;
+    current = 0;
+    document.getElementById("result").style.display = "none";
+    document.getElementById("quiz-container").style.display = "none";
+    document.getElementById("start-screen").style.display = "block";
+  }
+</script>
+
+</body>
+</html>
+
